@@ -1,15 +1,11 @@
-# Fichiers compilés
 *.o
 *.out
 *.exe
 *.a
 *.so
 
-# Dossier build
 build/
 
-# VSCode
 .vscode/
 
-# Logs
 *.log
