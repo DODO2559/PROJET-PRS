@@ -1,14 +1,18 @@
+# Variables de compilation
 CC = gcc
-CFLAGS = -Wall -Wextra -Iinclude
-SRC = $(wildcard src/*.c)
-OBJ = $(SRC:.c=.o)
-TARGET = build/program
+CFLAGS = -Wall -Wextra -g
 
-all: $(TARGET)
+# Cibles à générer
+all: broker client
 
-$(TARGET): $(OBJ)
-	mkdir -p build
-	$(CC) $(CFLAGS) -o $@ $^
+# Compilation du Broker
+broker: broker.c message.h
+	$(CC) $(CFLAGS) broker.c -o broker
 
+# Compilation du Client
+client: client.c message.h
+	$(CC) $(CFLAGS) client.c -o client
+
+# Nettoyage des fichiers binaires
 clean:
-	rm -rf src/*.o build
+	rm -f broker client

@@ -39,8 +39,23 @@ CHECK(balId = msgget(laClef,0 ),"msgget");
 /* Type de message = 1                             */
 uneRequete.type=1;
 uneRequete.corps.pid=getpid();
+
+//On crée le tube (le nom est en fonction du pid du client pour pouvoir les dissocier)
 sprintf(nomTube, "fifo_%d", uneRequete.corps.pid);
 mkfifo(nomTube, 0666);
+
+//lecture des tubes
+if (fork() == 0) {
+
+    while (1) {
+        int sortieTube = open(nomTube, O_RDONLY);
+        read(sortieTube, message, TAILLE_MESSAGE);
+        printf("\n Message reçu par le tube nommé : %s\n", message);
+        close(sortieTube);
+    }
+    exit(0);
+}
+//saisie des msgs
 for (i=0;i < 10; i++)
 {
         
@@ -56,11 +71,7 @@ for (i=0;i < 10; i++)
             sprintf(uneRequete.corps.msg, "%s", leTexte);
             CHECK(msgsnd(balId,&uneRequete,sizeof(t_corps),0),"msgsnd");
         }
-        int sortieTube = open(nomTube, O_RDONLY); 
-        read(sortieTube, message, TAILLE_MESSAGE);
-        printf("Message reçu par le tube nommé : %s\n", message);
-        close(sortieTube);
-}
+    }
 unlink(nomTube);
 return 0;
 
