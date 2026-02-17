@@ -1,18 +1,13 @@
-# Variables de compilation
 CC = gcc
-CFLAGS = -Wall -Wextra -g
+CFLAGS = -Wall
 
-# Cibles à générer
-all: broker client
+all: broker client menu.x
 
-# Compilation du Broker
-broker: broker.c message.h
-	$(CC) $(CFLAGS) broker.c -o broker
+broker client: %: %.c message.h
+	$(CC) $(CFLAGS) $< -o $@
 
-# Compilation du Client
-client: client.c message.h
-	$(CC) $(CFLAGS) client.c -o client
+menu.x: menu.c
+	$(CC) $(CFLAGS) $< -o $@ -lncursesw
 
-# Nettoyage des fichiers binaires
 clean:
-	rm -f broker client
+	rm -f broker client menu.x
