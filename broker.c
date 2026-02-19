@@ -46,20 +46,30 @@ do
 {
         /* Lecture de tous les messages de type = 1 */
         /* msgflg = 0 : nous sommes en attente bloquante de messages de type 1 */
-        CHECK(msgrcv(balId,&uneRequete,sizeof(t_corps),1,0),"msgrcv");
-
-        //On stocke dans le tableau les pid des clients
-        for (int i = 0; i < MAX_CLIENTS; i++) {
-                if (pids[i] == 0) { 
-                        pids[i] = uneRequete.corps.pid;
-                        break;
-                } 
-                if (pids[i] == uneRequete.corps.pid){
-                        break;
+        CHECK(msgrcv(balId,&uneRequete,sizeof(t_corps),0,0),"msgrcv");
+        if (uneRequete.type == 1) {
+                for (int i = 0; i < MAX_CLIENTS; i++) {
+                        if (pids[i] == uneRequete.corps.pid_expediteur) {
+                                break;
+                        }
+                        if (pids[i] == 0) {
+                                pids[i] = uneRequete.corps.pid_expediteur;
+                                break;
+                        }
                 }
-                
         }
-
+        if (uneRequete.type == 3) {
+        t_requete reponse;
+        reponse.type = uneRequete.corps.pid_expediteur; 
+        for(int i=0; i < MAX_CLIENTS; i++) {
+                reponse.corps.pids[i] = pids[i];
+        }
+        msgsnd(balId, &reponse, sizeof(t_corps), 0);
+        }
+    
+        else{
+        //test affichage du destinataire du message
+        printf("Message reçu du client %d destiné au client %d \n", uneRequete.corps.pid_expediteur, uneRequete.corps.pid_destinataire);
         //On écris dans le message de le tube attribué à chaque client
         for (int i = 0; i < MAX_CLIENTS; i++) {
                 if (pids[i] != 0) {
@@ -69,7 +79,7 @@ do
                         close(entreeTube);
                 }
         }
-
+        }
 
         
         

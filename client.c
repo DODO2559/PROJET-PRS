@@ -17,7 +17,8 @@
 #define CHECK(sts, msg) if ((sts)==-1) {perror(msg); exit(-1);}
 #define PROJECTID 1
 #define TAILLE_MESSAGE 256
-
+#define NB_CLIENTS 100
+pid_t pids[NB_CLIENTS]={0};
 int main(int argc, char *argv[])
 {
 int balId;
@@ -35,14 +36,16 @@ CHECK(laClef =ftok("broker",PROJECTID),"ftok");
 CHECK(balId = msgget(laClef,0 ),"msgget");
 
 
-/* Ecriture de dix messages dans la boite aux lettres */
-/* Type de message = 1                             */
-uneRequete.type=1;
-uneRequete.corps.pid=getpid();
+
+/* Type de message = 1 message privée
+   Type de message = 2 message public       
+   Type de message = 3 demande la liste des clients au broker               */
+
 
 //On crée le tube (le nom est en fonction du pid du client pour pouvoir les dissocier)
-sprintf(nomTube, "fifo_%d", uneRequete.corps.pid);
+sprintf(nomTube, "fifo_%d", getpid());
 mkfifo(nomTube, 0666);
+
 
 //lecture des tubes
 if (fork() == 0) {
@@ -55,23 +58,63 @@ if (fork() == 0) {
     }
     exit(0);
 }
+
+uneRequete.type = 1;
+uneRequete.corps.pid_expediteur = getpid();
+uneRequete.corps.pid_destinataire = 0; 
+strcpy(uneRequete.corps.msg, "--- INIT ---"); // <--- AJOUTE CECI
+msgsnd(balId, &uneRequete, sizeof(t_corps), 0);
 //saisie des msgs
-for (i=0;i < 10; i++)
-{
+   while (1) {
+        // type 3 donc demande au broker laliste
+        uneRequete.type = 3;
+        uneRequete.corps.pid_expediteur = getpid();
+        msgsnd(balId, &uneRequete, sizeof(t_corps), 0);
+        msgrcv(balId, &uneRequete, sizeof(t_corps), getpid(), 0);
         
-        printf("\nSaisissez votre message : ");
-        fgets(leTexte,sizeof(leTexte),stdin);
-        if (strncmp(leTexte,"EXIT",4) == 0)
-        {
-            strcpy(uneRequete.corps.msg,"EXIT");
-            CHECK(msgsnd(balId,&uneRequete,sizeof(t_corps),0),"msgsnd");
-            break;
+        printf("\nClients connectes :\n");
+        for (int i = 0; i < 10; i++) {
+            if (uneRequete.corps.pids[i] != 0 && uneRequete.corps.pids[i] != getpid())
+                printf("  - PID: %d\n", uneRequete.corps.pids[i]);
+            pids[i] = uneRequete.corps.pids[i];
         }
-        else {
-            sprintf(uneRequete.corps.msg, "%s", leTexte);
-            CHECK(msgsnd(balId,&uneRequete,sizeof(t_corps),0),"msgsnd");
+        
+        printf("\nEntrez le PID du destinataire : ");
+        scanf("%d", &uneRequete.corps.pid_destinataire);
+        getchar(); 
+        printf("\n");
+        
+        //verif si destinaire est connecté 
+        int destinataireConnecte = 0;
+        for (int i = 0; i < NB_CLIENTS; i++) {
+            if (pids[i] == uneRequete.corps.pid_destinataire) {
+                destinataireConnecte = 1;
+                break;
+            }
         }
-    }
+        if(destinataireConnecte==1){
+            printf("\nSaisissez votre message : ");
+            fgets(leTexte,sizeof(leTexte),stdin);
+            uneRequete.type = 3;
+            uneRequete.corps.pid_expediteur = getpid();
+            if (strncmp(leTexte,"EXIT",4) == 0)
+            {
+                strcpy(uneRequete.corps.msg,"EXIT");
+                CHECK(msgsnd(balId,&uneRequete,sizeof(t_corps),0),"msgsnd");
+                break;
+            }
+            else {
+                sprintf(uneRequete.corps.msg, "%s", leTexte);
+                CHECK(msgsnd(balId,&uneRequete,sizeof(t_corps),0),"msgsnd");
+            }
+            printf("\n");
+        }else {
+            printf("Il n'y a pas de client avec ce PID dans la liste veuillez en saisir un valide \n");
+            continue;
+        }
+
+}
+
 unlink(nomTube);
 return 0;
 
