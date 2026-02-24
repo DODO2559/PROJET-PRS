@@ -11,8 +11,8 @@
 #define NB_CHOICES 3
 
 const char *choices[NB_CHOICES] = {
-    "Salon General",
-    "Option 2 : Afficher l'heure",
+    "Option 1 : Salon General",
+    "Option 2 : Messages privés",
     "Option 3 : Quitter"
 };
 
@@ -75,16 +75,17 @@ int main() {
                 clear();
                 if (highlight == 0) {
                     endwin(); 
-                    system("./client");
+                    system("./client_broadcast");
                     sleep(2);
                     initscr(); 
                     keypad(stdscr, TRUE); 
                 }
                 else if (highlight == 1) {
-                    //mvprintw(4, 4, "Il est temps de coder !");
-                    affiche_heure(buffer);
-                    mvprintw(4, 4, "Nous sommes le %s, il est grand temps de coder !",buffer);
-                    wait_for_enter();
+                    endwin(); 
+                    system("./client_mp");
+                    sleep(2);
+                    initscr(); 
+                    keypad(stdscr, TRUE); 
                 }
                 else if (highlight == 2) {
                     endwin();

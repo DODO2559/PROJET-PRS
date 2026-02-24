@@ -71,14 +71,20 @@ msgsnd(balId, &uneRequete, sizeof(t_corps), 0);
         uneRequete.corps.pid_expediteur = getpid();
         msgsnd(balId, &uneRequete, sizeof(t_corps), 0);
         msgrcv(balId, &uneRequete, sizeof(t_corps), getpid(), 0);
-        
+        int nbclients = 0;
         printf("\nClients connectes :\n");
         for (int i = 0; i < 10; i++) {
-            if (uneRequete.corps.pids[i] != 0 && uneRequete.corps.pids[i] != getpid())
+            if (uneRequete.corps.pids[i] != 0 && uneRequete.corps.pids[i] != getpid()){
                 printf("  - PID: %d\n", uneRequete.corps.pids[i]);
+                nbclients++;}
             pids[i] = uneRequete.corps.pids[i];
+            
         }
-        
+        if(nbclients==0){
+            printf("Aucun utilisateur n'est connecté, entrez un message quelconque pour actualiser la liste : ");
+            fgets(leTexte, sizeof(leTexte), stdin);
+            continue;
+        }
         printf("\nEntrez le PID du destinataire : ");
         scanf("%d", &uneRequete.corps.pid_destinataire);
         getchar(); 
@@ -95,7 +101,7 @@ msgsnd(balId, &uneRequete, sizeof(t_corps), 0);
         if(destinataireConnecte==1){
             printf("\nSaisissez votre message : ");
             fgets(leTexte,sizeof(leTexte),stdin);
-            uneRequete.type = 3;
+            uneRequete.type = 1;
             uneRequete.corps.pid_expediteur = getpid();
             if (strncmp(leTexte,"EXIT",4) == 0)
             {

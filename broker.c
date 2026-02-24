@@ -72,7 +72,7 @@ do
         printf("Message reçu du client %d destiné au client %d \n", uneRequete.corps.pid_expediteur, uneRequete.corps.pid_destinataire);
         //On écris dans le message de le tube attribué à chaque client
         for (int i = 0; i < MAX_CLIENTS; i++) {
-                if (pids[i] != 0) {
+                if (pids[i] != 0 && pids[i] == uneRequete.corps.pid_destinataire) {
                         sprintf(nomTube, "fifo_%d", pids[i]);
                         int entreeTube = open(nomTube, O_WRONLY | O_NONBLOCK);
                         write(entreeTube, uneRequete.corps.msg, sizeof(uneRequete.corps.msg));
