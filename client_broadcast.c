@@ -29,7 +29,7 @@ key_t laClef;
 char nomTube[50] = "tube";
 char message[TAILLE_MESSAGE]="RIEN";
 CHECK(laClef =ftok("broker",PROJECTID),"ftok");
-
+uneRequete.corps.choix_menu = 1;
 /* Ouverture  de la boite aux lettres (déjà créée par le serveur )*/
 
 CHECK(balId = msgget(laClef,0 ),"msgget");

@@ -30,15 +30,14 @@ key_t laClef;
 char nomTube[50] = "tube";
 char message[TAILLE_MESSAGE]="RIEN";
 CHECK(laClef =ftok("broker",PROJECTID),"ftok");
-
+uneRequete.corps.choix_menu = 2;
 /* Ouverture  de la boite aux lettres (déjà créée par le serveur )*/
 
 CHECK(balId = msgget(laClef,0 ),"msgget");
 
 
 
-/* Type de message = 1 message privée
-   Type de message = 2 message public       
+/* Type de message = 1 message  
    Type de message = 3 demande la liste des clients au broker               */
 
 
@@ -62,7 +61,6 @@ if (fork() == 0) {
 uneRequete.type = 1;
 uneRequete.corps.pid_expediteur = getpid();
 uneRequete.corps.pid_destinataire = 0; 
-strcpy(uneRequete.corps.msg, "--- INIT ---"); // <--- AJOUTE CECI
 msgsnd(balId, &uneRequete, sizeof(t_corps), 0);
 //saisie des msgs
    while (1) {
@@ -75,7 +73,7 @@ msgsnd(balId, &uneRequete, sizeof(t_corps), 0);
         printf("\nClients connectes :\n");
         for (int i = 0; i < 10; i++) {
             if (uneRequete.corps.pids[i] != 0 && uneRequete.corps.pids[i] != getpid()){
-                printf("  - PID: %d\n", uneRequete.corps.pids[i]);
+                printf("PID: %d\n", uneRequete.corps.pids[i]);
                 nbclients++;}
             pids[i] = uneRequete.corps.pids[i];
             

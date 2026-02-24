@@ -40,8 +40,9 @@ CHECK(laClef =ftok("broker",PROJECTID),"ftok");
 /* Creation de la boite aux lettres */
 
 CHECK(balId = msgget(laClef,IPC_CREAT | 0666 ),"msgget");
-
-
+CHECK(msgrcv(balId, &uneRequete, sizeof(t_corps), 0, 0), "msgrcv");
+//MP
+if(uneRequete.corps.choix_menu==2){
 do
 {
         /* Lecture de tous les messages de type = 1 */
@@ -86,7 +87,44 @@ do
         
 
  } while (strncmp(uneRequete.corps.msg,"EXIT",4) !=0);
+}
+//BROADCAST
+if(uneRequete.corps.choix_menu==1){
+do
+{
+        /* Lecture de tous les messages de type = 1 */
+        /* msgflg = 0 : nous sommes en attente bloquante de messages de type 1 */
+        CHECK(msgrcv(balId,&uneRequete,sizeof(t_corps),1,0),"msgrcv");
 
+        //On stocke dans le tableau les pid des clients
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+                if (pids[i] == 0) { 
+                        pids[i] = uneRequete.corps.pid_expediteur;
+                        break;
+                } 
+                if (pids[i] == uneRequete.corps.pid_expediteur){
+                        break;
+                }
+                
+        }
+
+        //On écris dans le message de le tube attribué à chaque client
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+                if (pids[i] != 0) {
+                        sprintf(nomTube, "fifo_%d", pids[i]);
+                        int entreeTube = open(nomTube, O_WRONLY | O_NONBLOCK);
+                        write(entreeTube, uneRequete.corps.msg, sizeof(uneRequete.corps.msg));
+                        close(entreeTube);
+                }
+        }
+
+
+        
+        
+        
+
+ } while (strncmp(uneRequete.corps.msg,"EXIT",4) !=0);
+}
 
 /* Destruction de la boite aux lettres */
 CHECK(msgctl(balId,IPC_RMID,&buf),"msgctl");
