@@ -9,6 +9,9 @@
 #include <sys/stat.h>  
 #include <fcntl.h>
 #include "message.h"
+#include <sys/shm.h>
+#include <sys/types.h>
+
 /* ============================================================================= */
 /*                                                                               */
 /* bal3_c.c    : client                                                          */
@@ -18,6 +21,7 @@
 #define PROJECTID 1
 #define TAILLE_MESSAGE 256
 #define NB_CLIENTS 100
+#define KEY_MEM 1234
 pid_t pids[NB_CLIENTS]={0};
 int main(int argc, char *argv[])
 {
@@ -31,15 +35,12 @@ char nomTube[50] = "tube";
 char message[TAILLE_MESSAGE]="RIEN";
 CHECK(laClef =ftok("broker",PROJECTID),"ftok");
 uneRequete.corps.choix_menu = 2;
+int test_mem;
+int *liste_partagée;
 /* Ouverture  de la boite aux lettres (déjà créée par le serveur )*/
-
-CHECK(balId = msgget(laClef,0 ),"msgget");
-
-
-
-/* Type de message = 1 message  
-   Type de message = 3 demande la liste des clients au broker               */
-
+test_mem = shmget(KEY_MEM, sizeof(int)*NB_CLIENTS,  0666 | IPC_CREAT );
+// j'attache le processus à la mémoire partagée
+liste_partagée = (int*) shmat(test_mem,NULL,0);
 
 //On crée le tube (le nom est en fonction du pid du client pour pouvoir les dissocier)
 sprintf(nomTube, "fifo_%d", getpid());
@@ -58,51 +59,38 @@ if (fork() == 0) {
     exit(0);
 }
 
-uneRequete.type = 1;
-uneRequete.corps.pid_expediteur = getpid();
-uneRequete.corps.pid_destinataire = 0; 
-msgsnd(balId, &uneRequete, sizeof(t_corps), 0);
 //saisie des msgs
    while (1) {
-        // type 3 donc demande au broker laliste
-        uneRequete.type = 3;
-        uneRequete.corps.pid_expediteur = getpid();
-        msgsnd(balId, &uneRequete, sizeof(t_corps), 0);
-        msgrcv(balId, &uneRequete, sizeof(t_corps), getpid(), 0);
-        int nbclients = 0;
-        printf("\nClients connectes :\n");
-        for (int i = 0; i < 10; i++) {
-            if (uneRequete.corps.pids[i] != 0 && uneRequete.corps.pids[i] != getpid()){
-                printf("PID: %d\n", uneRequete.corps.pids[i]);
-                nbclients++;}
-            pids[i] = uneRequete.corps.pids[i];
-            
-        }
-        if(nbclients==0){
-            printf("Aucun utilisateur n'est connecté, entrez un message quelconque pour actualiser la liste : ");
-            fgets(leTexte, sizeof(leTexte), stdin);
-            continue;
-        }
-        printf("\nEntrez le PID du destinataire : ");
-        scanf("%d", &uneRequete.corps.pid_destinataire);
-        getchar(); 
-        printf("\n");
-        
-        //verif si destinaire est connecté 
-        int destinataireConnecte = 0;
-        for (int i = 0; i < NB_CLIENTS; i++) {
-            if (pids[i] == uneRequete.corps.pid_destinataire) {
-                destinataireConnecte = 1;
+//////////////////////////// 
+// MEMOIRE PARTAGEE
+        for (i=0; i<NB_CLIENTS; i++){
+            if (liste_partagée[i] == 0)
+            {
+                liste_partagée[i] = getpid();
                 break;
             }
         }
-        if(destinataireConnecte==1){
+        printf("Clients connectes : ");
+        for (i = 0; i < NB_CLIENTS; i++) {
+            if (liste_partagée[i] != 0) {
+                printf("[%d] ", liste_partagée[i]);
+            }       
+}
+///////////////////////////////        
             printf("\nSaisissez votre message : ");
             fgets(leTexte,sizeof(leTexte),stdin);
-            uneRequete.type = 1;
             uneRequete.corps.pid_expediteur = getpid();
             if (strncmp(leTexte,"EXIT",4) == 0)
             {
+                // On libère la place dans la mémoire partagée quand on ferme le client
+                for ( i = 0; i < NB_CLIENTS; i++)
+                {
+                    if (liste_partagée[i] == getpid())
+                    {
+                        liste_partagée[i] = 0;
+                        break;
+                    }
+                }  
                 strcpy(uneRequete.corps.msg,"EXIT");
                 CHECK(msgsnd(balId,&uneRequete,sizeof(t_corps),0),"msgsnd");
                 break;
@@ -112,10 +100,7 @@ msgsnd(balId, &uneRequete, sizeof(t_corps), 0);
                 CHECK(msgsnd(balId,&uneRequete,sizeof(t_corps),0),"msgsnd");
             }
             printf("\n");
-        }else {
-            printf("Il n'y a pas de client avec ce PID dans la liste veuillez en saisir un valide \n");
-            continue;
-        }
+        
 
 }
 

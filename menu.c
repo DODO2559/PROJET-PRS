@@ -12,7 +12,7 @@
 
 const char *choices[NB_CHOICES] = {
     "Option 1 : Salon General",
-    "Option 2 : Messages privés",
+    "Option 2 : Messages prives",
     "Option 3 : Quitter"
 };
 
