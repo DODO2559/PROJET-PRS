@@ -32,39 +32,39 @@ int main(int argc, char *argv[])
 
 struct msqid_ds buf;
 t_requete uneRequete;
-char nomTube[50] = "tube";
+char nomTube[50] = "tubebroker";
 #define MAX_CLIENTS 10
 key_t laClef;
 pid_t pids[MAX_CLIENTS]={0};
-int test_mem;
-int test_att;
+
 CHECK(laClef =ftok("broker",PROJECTID),"ftok");
-mkfifo("broker", 0666);
-/* Creation de la boite aux lettres */
+mkfifo("tubebroker", 0666);
 
-// Création de la mémoire partagée
-
+/* Ouverture/Création + attachement de la mémoire partagée */
+int test_mem;
+int *liste_partagée;
 test_mem=shmget(KEY_MEM,1024,0666 | IPC_CREAT);
 if(test_mem == -1){
         printf("La sémphore à eu une erreur lors de la création");
       return -1;  
 }
-//attachement de la mémoire partagée
-test_att =  shmat(test_mem,NULL,SHM_RDONLY);
-if(test_att == -1){
+liste_partagée  =  (int*) shmat(test_mem,NULL,0);
+if(liste_partagée == (int*) -1){
         printf("La mémoire partagé ne s'est pas attachée");
         return -1;
-}     
-        
+}    
+//on vide la liste 
+for (int i = 0; i < NB_CLIENTS; i++) {
+    liste_partagée[i] = 0;
+}        
 
- 
 do{
 //MP
 if(uneRequete.corps.choix_menu==2){
 do
 {
-        /* Lecture de tous les messages de type = 1 */
-        /* msgflg = 0 : nous sommes en attente bloquante de messages de type 1 */
+        // Lecture de tous les messages de type = 1 
+        // msgflg = 0 : nous sommes en attente bloquante de messages de type 1 
         if (uneRequete.type == 1) {
                 for (int i = 0; i < MAX_CLIENTS; i++) {
                         if (pids[i] == uneRequete.corps.pid_expediteur) {
@@ -104,14 +104,17 @@ do
 
  } while (strncmp(uneRequete.corps.msg,"EXIT",4) !=0);
 }
+
+
 //BROADCAST
-if(uneRequete.corps.choix_menu==1){
+//if(uneRequete.corps.choix_menu==1){
 
 
 
         
 do
 {       
+        /*
         for (int i = 0; i < MAX_CLIENTS; i++) {
                 if (pids[i] == 0) { 
                         pids[i] = uneRequete.corps.pid_expediteur;
@@ -121,40 +124,45 @@ do
                         break;
                 }  
         }
+                */
 
-        if (fork() == 0) {
                 while (1) {
-                        int sortieTube = open(nomTube, O_RDONLY);
-                        read(sortieTube, message, TAILLE_MESSAGE);
+                        //affichage des clients connectés
+                                printf("Clients connectes : ");
+                                for (int i = 0; i < NB_CLIENTS; i++) {
+                                if (liste_partagée[i] != 0) {
+                                        printf("[%d] ", liste_partagée[i]);
+                                }       
+                        }
+                        //affichage du message reçu
+                        int sortieTube = open("tubebroker", O_RDONLY);
+                        read(sortieTube, &uneRequete, sizeof(uneRequete));
+                        printf("\n Message reçu par le tube nommé : %s\n", uneRequete.corps.msg);
                         close(sortieTube);
-                        int recu = 1;
-                        fcntl(nomTube, F_SETFL, O_NONBLOCK);
-                        ssize_t octets = read(nomTube, bufR, sizeof(bufR));
-                        for (int i = 0; i < MAX_CLIENTS; i++) {
-                        
-                
-                        if (octets > 0) {
-                        for (int j = 0; j < MAX_CLIENTS; j++) {
-                                sprintf(nomTube, "fifo_%d", pids[j]);
-                                int entreeTube = open(nomTube, O_WRONLY | O_NONBLOCK);
-                                write(entreeTube, uneRequete.corps.msg, sizeof(uneRequete.corps.msg));
-                                close(entreeTube);}}
-                        else {
-                                continue;
+
+
+                        //renvoie à tout les clients
+                        for (int i = 0; i < NB_CLIENTS; i++) {
+                                if (liste_partagée[i] != 0) {
+                                        sprintf(nomTube, "fifo_%d", liste_partagée[i]);
+                                        int entreeTube = open(nomTube, O_WRONLY | O_NONBLOCK);
+                                        write(entreeTube, uneRequete.corps.msg, sizeof(uneRequete.corps.msg));
+                                        close(entreeTube);
+                                }    
+
+                                
                         }
-                        
-                        }
-                        exit(0);
+
         }
 
         
 
                 
-        }                       
+       // }                       
         
 
  } while (1);
-}
+//}
 } while(1);
 
 return 0;

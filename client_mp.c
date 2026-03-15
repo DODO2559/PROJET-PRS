@@ -35,12 +35,19 @@ char nomTube[50] = "tube";
 char message[TAILLE_MESSAGE]="RIEN";
 CHECK(laClef =ftok("broker",PROJECTID),"ftok");
 uneRequete.corps.choix_menu = 2;
+/* Ouverture/Création + attachement de la mémoire partagée */
 int test_mem;
 int *liste_partagée;
-/* Ouverture  de la boite aux lettres (déjà créée par le serveur )*/
-test_mem = shmget(KEY_MEM, sizeof(int)*NB_CLIENTS,  0666 | IPC_CREAT );
-// j'attache le processus à la mémoire partagée
-liste_partagée = (int*) shmat(test_mem,NULL,0);
+test_mem=shmget(KEY_MEM,1024,0666 | IPC_CREAT);
+if(test_mem == -1){
+        printf("La sémphore à eu une erreur lors de la création");
+      return -1;  
+}
+liste_partagée  =  (int*) shmat(test_mem,NULL,SHM_RDONLY);
+if(liste_partagée == (int*) -1){
+        printf("La mémoire partagé ne s'est pas attachée");
+        return -1;
+}  
 
 //On crée le tube (le nom est en fonction du pid du client pour pouvoir les dissocier)
 sprintf(nomTube, "fifo_%d", getpid());
