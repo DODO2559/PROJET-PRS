@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sys/stat.h>  
 #include <fcntl.h>
+#include <semaphore.h>
 #include "message.h"
 #include <sys/shm.h>
 #include <sys/types.h>
@@ -37,6 +38,8 @@ CHECK(laClef =ftok("broker",PROJECTID),"ftok");
 uneRequete.corps.choix_menu = 1;
 int listé = 0;
 int trouvé = 0;
+int liste_pids[100];
+sem_t *sem = sem_open("/semaphore", 0);
 //Envoi du choix du mode 
 int entreeTube = open("tubebroker", O_WRONLY | O_NONBLOCK);
             write(entreeTube, &uneRequete, sizeof(uneRequete));
@@ -44,7 +47,7 @@ int entreeTube = open("tubebroker", O_WRONLY | O_NONBLOCK);
 /* Ouverture/Création + attachement de la mémoire partagée */
 int test_mem;
 int *liste_partagée;
-test_mem=shmget(KEY_MEM,1024,0666 | IPC_CREAT);
+test_mem=shmget(KEY_MEM,1024,0666);
 if(test_mem == -1){
         printf("La sémphore à eu une erreur lors de la création");
       return -1;  
@@ -75,6 +78,7 @@ if (fork() == 0) {
 //saisie des msgs
 for (i=0;i < 1000; i++)
 {   
+    sem_wait(sem);
         for (int j=0; j<NB_CLIENTS; j++){
             if (liste_partagée[j] == getpid())
             {
@@ -92,10 +96,14 @@ for (i=0;i < 1000; i++)
                 }
             }
         }
+        for(int i=0; i<100; i++) {
+        liste_pids[i] = liste_partagée[i]; 
+        }
+        sem_post(sem);
             printf("Liste Client :");
             for (int j=0; j<NB_CLIENTS; j++){
                 if (liste_partagée[j] != 0) {
-                    printf(" [%d]", liste_partagée[j]);
+                    printf(" [%d]", liste_pids[j]);
                 }
             }
             printf("\n");
@@ -104,8 +112,9 @@ for (i=0;i < 1000; i++)
         fgets(leTexte,sizeof(leTexte),stdin);
         uneRequete.corps.pid_destinataire = atoi(leTexte);
         if(uneRequete.corps.pid_destinataire != 0){
+        trouvé = 0;
         for (int j=0; j<NB_CLIENTS; j++){
-            if(liste_partagée[j] == uneRequete.corps.pid_destinataire)
+            if(liste_pids[j] == uneRequete.corps.pid_destinataire)
             {
                 trouvé = 1;
                 break;
@@ -119,6 +128,7 @@ for (i=0;i < 1000; i++)
         fgets(leTexte,sizeof(leTexte),stdin);
         if (strncmp(leTexte,"EXIT",4) == 0)
         {
+            sem_wait(sem);
             for (int j=0; j<NB_CLIENTS; j++){
                 if (liste_partagée[j] == getpid())
                 {
@@ -126,6 +136,7 @@ for (i=0;i < 1000; i++)
                     break;
                 }
             }
+            sem_post(sem);
             printf("\n Sortie de l'application");
             break;
         }
@@ -136,7 +147,11 @@ for (i=0;i < 1000; i++)
             close(entreeTube);
         }
     }
+shmdt(liste_partagée);
+sem_close(sem);
 unlink(nomTube);
+
+
 return 0;
 
 

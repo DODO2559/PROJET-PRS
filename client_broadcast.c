@@ -7,6 +7,7 @@
 #include <string.h>
 #include <string.h>
 #include <sys/stat.h>  
+#include <semaphore.h>
 #include <fcntl.h>
 #include "message.h"
 #include <sys/shm.h>
@@ -31,10 +32,12 @@ int i=0;
 #define NB_CLIENTS 100
 char leTexte[100];
 key_t laClef;
+int liste_pids[100];
 char nomTube[50] = "tube";
 char message[TAILLE_MESSAGE]="RIEN";
 CHECK(laClef =ftok("broker",PROJECTID),"ftok");
 uneRequete.corps.choix_menu = 1;
+sem_t *sem = sem_open("/semaphore", 0);
 int listé = 0;
 //Envoi du choix du mode 
 int entreeTube = open("tubebroker", O_WRONLY | O_NONBLOCK);
@@ -43,7 +46,7 @@ int entreeTube = open("tubebroker", O_WRONLY | O_NONBLOCK);
 /* Ouverture/Création + attachement de la mémoire partagée */
 int test_mem;
 int *liste_partagée;
-test_mem=shmget(KEY_MEM,1024,0666 | IPC_CREAT);
+test_mem=shmget(KEY_MEM,1024,0666);
 if(test_mem == -1){
         printf("La sémphore à eu une erreur lors de la création");
       return -1;  
@@ -75,6 +78,7 @@ if (fork() == 0) {
 //saisie des msgs
 for (i=0;i < 1000; i++)
 {   
+    sem_wait(sem);
         for (int j=0; j<NB_CLIENTS; j++){
             if (liste_partagée[j] == getpid())
             {
@@ -92,11 +96,12 @@ for (i=0;i < 1000; i++)
                 }
             }
         }
+        sem_post(sem);
         if(i==0) printf("Saisissez votre message : "); 
         fgets(leTexte,sizeof(leTexte),stdin);
         if (strncmp(leTexte,"EXIT",4) == 0)
         {
-            listé = 0;
+            sem_wait(sem);
             for (int j=0; j<NB_CLIENTS; j++){
                 if (liste_partagée[j] == getpid())
                 {
@@ -104,6 +109,7 @@ for (i=0;i < 1000; i++)
                     break;
                 }
             }
+            sem_post(sem);
             printf("\n Sortie de l'application");
             break;
         }
@@ -114,6 +120,8 @@ for (i=0;i < 1000; i++)
             close(entreeTube);
         }
     }
+shmdt(liste_partagée);
+sem_close(sem);
 unlink(nomTube);
 return 0;
 

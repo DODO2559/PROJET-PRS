@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/stat.h>  
 #include <fcntl.h>
+#include <semaphore.h>
 #include "message.h"
 #include <sys/types.h>
 #include <sys/shm.h>
@@ -22,7 +23,6 @@
 #define BUFFER_WRITE_SIZE 256
 #define TAILLE_MESSAGE 256
 #define KEY_MEM 1234
-pid_t pids[NB_CLIENTS];
 char message[BUFFER_WRITE_SIZE];
 char bufR[BUFFER_READ_SIZE];
 
@@ -35,11 +35,10 @@ t_requete uneRequete;
 char nomTube[50] = "tubebroker";
 #define MAX_CLIENTS 10
 key_t laClef;
-pid_t pids[MAX_CLIENTS]={0};
-
+//Init du tube broker et de la sémaphore
 CHECK(laClef =ftok("broker",PROJECTID),"ftok");
 mkfifo("tubebroker", 0666);
-
+sem_t *sem = sem_open("/semaphore", O_CREAT, 0666, 1);
 /* Ouverture/Création + attachement de la mémoire partagée */
 int test_mem;
 int *liste_partagée;
@@ -72,19 +71,21 @@ do
                         read(sortieTube, &uneRequete, sizeof(uneRequete));
                         close(sortieTube);
 
-
+                        sem_wait(sem);
                         //renvoie au destinataire
                         for (int i = 0; i < NB_CLIENTS; i++) {
+                                
                                 if (liste_partagée[i] != 0 && liste_partagée[i] == uneRequete.corps.pid_destinataire) {
                                         sprintf(nomTube, "fifo_%d", liste_partagée[i]);
                                         int entreeTube = open(nomTube, O_WRONLY | O_NONBLOCK);
                                         write(entreeTube, uneRequete.corps.msg, sizeof(uneRequete.corps.msg));
                                         close(entreeTube);
                                 }    
+                                
 
                                 
                         }
-
+                        sem_post(sem);
         
 
         
@@ -106,6 +107,7 @@ if(uneRequete.corps.choix_menu==1){
 do
 {       
                 while (1) {
+                        sem_wait(sem);
                         //affichage des clients connectés
                                 printf("Clients connectes : ");
                                 for (int i = 0; i < NB_CLIENTS; i++) {
@@ -119,7 +121,6 @@ do
                         printf("\n Message reçu par le tube nommé : %s\n", uneRequete.corps.msg);
                         close(sortieTube);
 
-
                         //renvoie à tout les clients
                         for (int i = 0; i < NB_CLIENTS; i++) {
                                 if (liste_partagée[i] != 0) {
@@ -131,7 +132,7 @@ do
 
                                 
                         }
-
+                        sem_post(sem);
         }
 
         
@@ -143,6 +144,11 @@ do
  } while (1);
 }
 } while(1);
-
+shmdt(liste_partagée);
+shmctl(test_mem, IPC_RMID, NULL);
+sem_close(sem);
+sem_unlink("/semaphore");
+unlink("tubebroker");   
 return 0;
+
 }

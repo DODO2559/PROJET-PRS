@@ -2,7 +2,6 @@ typedef struct corps {
         pid_t pid_expediteur;
         pid_t pid_destinataire;
         char msg[256];
-        pid_t pids[100];
         int choix_menu;
 } t_corps;
 
