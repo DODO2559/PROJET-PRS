@@ -10,5 +10,6 @@ menu.x: menu.c
 	$(CC) $(CFLAGS) $< -o $@ -lncursesw
 
 clean:
-	rm -f broker client_broadcast client_mp menu.x
+	rm -f *.o broker client_mp client_broadcast menu.x
 	rm -f fifo_*
+	rm -f tubebroker
