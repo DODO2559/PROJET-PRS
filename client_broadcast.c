@@ -36,6 +36,10 @@ char message[TAILLE_MESSAGE]="RIEN";
 CHECK(laClef =ftok("broker",PROJECTID),"ftok");
 uneRequete.corps.choix_menu = 1;
 int listé = 0;
+//Envoi du choix du mode 
+int entreeTube = open("tubebroker", O_WRONLY | O_NONBLOCK);
+            write(entreeTube, uneRequete.corps.choix_menu, sizeof(uneRequete));
+            close(entreeTube);
 /* Ouverture/Création + attachement de la mémoire partagée */
 int test_mem;
 int *liste_partagée;

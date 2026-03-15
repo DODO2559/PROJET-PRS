@@ -59,73 +59,52 @@ for (int i = 0; i < NB_CLIENTS; i++) {
 }        
 
 do{
+        if (strlen(uneRequete.corps.msg) == 0) {
+        int sortieTube = open("tubebroker", O_RDONLY);
+                        read(sortieTube, &uneRequete, sizeof(uneRequete));
+                        close(sortieTube);
+                        }
 //MP
 if(uneRequete.corps.choix_menu==2){
 do
-{
-        // Lecture de tous les messages de type = 1 
-        // msgflg = 0 : nous sommes en attente bloquante de messages de type 1 
-        if (uneRequete.type == 1) {
-                for (int i = 0; i < MAX_CLIENTS; i++) {
-                        if (pids[i] == uneRequete.corps.pid_expediteur) {
-                                break;
+{                       //recup le message reçu
+                        int sortieTube = open("tubebroker", O_RDONLY);
+                        read(sortieTube, &uneRequete, sizeof(uneRequete));
+                        close(sortieTube);
+
+
+                        //renvoie au destinataire
+                        for (int i = 0; i < NB_CLIENTS; i++) {
+                                if (liste_partagée[i] != 0 && liste_partagée[i] == uneRequete.corps.pid_destinataire) {
+                                        sprintf(nomTube, "fifo_%d", liste_partagée[i]);
+                                        int entreeTube = open(nomTube, O_WRONLY | O_NONBLOCK);
+                                        write(entreeTube, uneRequete.corps.msg, sizeof(uneRequete.corps.msg));
+                                        close(entreeTube);
+                                }    
+
+                                
                         }
-                        if (pids[i] == 0) {
-                                pids[i] = uneRequete.corps.pid_expediteur;
-                                break;
-                        }
-                }
-        }
-        if (uneRequete.type == 3) {
-        t_requete reponse;
-        reponse.type = uneRequete.corps.pid_expediteur; 
-        for(int i=0; i < MAX_CLIENTS; i++) {
-                reponse.corps.pids[i] = pids[i];
-        }
-        }
-    
-        else{
-        //test affichage du destinataire du message
-        printf("Message reçu du client %d destiné au client %d \n", uneRequete.corps.pid_expediteur, uneRequete.corps.pid_destinataire);
-        //On écris dans le message de le tube attribué à chaque client
-        for (int i = 0; i < MAX_CLIENTS; i++) {
-                if (pids[i] != 0 && pids[i] == uneRequete.corps.pid_destinataire) {
-                        sprintf(nomTube, "fifo_%d", pids[i]);
-                        int entreeTube = open(nomTube, O_WRONLY | O_NONBLOCK);
-                        write(entreeTube, uneRequete.corps.msg, sizeof(uneRequete.corps.msg));
-                        close(entreeTube);
-                }
-        }
-        }
 
         
-        
+
         
 
- } while (strncmp(uneRequete.corps.msg,"EXIT",4) !=0);
+                
+                         
+        
+
+ } while (1);
 }
 
 
 //BROADCAST
-//if(uneRequete.corps.choix_menu==1){
+if(uneRequete.corps.choix_menu==1){
 
 
 
         
 do
 {       
-        /*
-        for (int i = 0; i < MAX_CLIENTS; i++) {
-                if (pids[i] == 0) { 
-                        pids[i] = uneRequete.corps.pid_expediteur;
-                        break;
-                } 
-                if (pids[i] == uneRequete.corps.pid_expediteur){
-                        break;
-                }  
-        }
-                */
-
                 while (1) {
                         //affichage des clients connectés
                                 printf("Clients connectes : ");
@@ -158,11 +137,11 @@ do
         
 
                 
-       // }                       
+                         
         
 
  } while (1);
-//}
+}
 } while(1);
 
 return 0;
