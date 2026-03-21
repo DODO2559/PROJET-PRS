@@ -41,28 +41,30 @@ mkfifo("tubebroker", 0666);
 sem_t *sem = sem_open("/semaphore", O_CREAT, 0666, 1);
 /* Ouverture/Création + attachement de la mémoire partagée */
 int test_mem;
-int *liste_partagée;
-test_mem=shmget(KEY_MEM,1024,0666 | IPC_CREAT);
+int *liste_pids_partagée;
+char (*liste_pseudos_partagée)[50];
+test_mem=shmget(KEY_MEM, 5000,0666 | IPC_CREAT);
 if(test_mem == -1){
         printf("La sémphore à eu une erreur lors de la création");
       return -1;  
 }
-liste_partagée  =  (int*) shmat(test_mem,NULL,0);
-if(liste_partagée == (int*) -1){
+liste_pids_partagée  =  (int*) shmat(test_mem,NULL,0);
+liste_pseudos_partagée  =  (char (*)[50])(liste_pids_partagée + 100);
+if(liste_pids_partagée == (int*) -1){
         printf("La mémoire partagé ne s'est pas attachée");
         return -1;
 }    
 //on vide la liste 
 for (int i = 0; i < NB_CLIENTS; i++) {
-    liste_partagée[i] = 0;
+    liste_pids_partagée[i] = 0;
+    liste_pseudos_partagée[i][0] = '\0';
 }        
 
 do{
-        if (strlen(uneRequete.corps.msg) == 0) {
         int sortieTube = open("tubebroker", O_RDONLY);
-                        read(sortieTube, &uneRequete, sizeof(uneRequete));
-                        close(sortieTube);
-                        }
+        read(sortieTube, &uneRequete, sizeof(uneRequete));
+        close(sortieTube);
+                        
 //MP
 if(uneRequete.corps.choix_menu==2){
 do
@@ -75,9 +77,9 @@ do
                         //renvoie au destinataire
                         for (int i = 0; i < NB_CLIENTS; i++) {
                                 
-                                if (liste_partagée[i] != 0 && liste_partagée[i] == uneRequete.corps.pid_destinataire) {
-                                        sprintf(nomTube, "fifo_%d", liste_partagée[i]);
-                                        int entreeTube = open(nomTube, O_WRONLY | O_NONBLOCK);
+                                if (liste_pids_partagée[i] != 0 && liste_pids_partagée[i] == uneRequete.corps.pid_destinataire) {
+                                        sprintf(nomTube, "fifo_%d", liste_pids_partagée[i]);
+                                        int entreeTube = open(nomTube, O_WRONLY);
                                         write(entreeTube, uneRequete.corps.msg, sizeof(uneRequete.corps.msg));
                                         close(entreeTube);
                                 }    
@@ -107,31 +109,25 @@ if(uneRequete.corps.choix_menu==1){
 do
 {       
                 while (1) {
-                        sem_wait(sem);
-                        //affichage des clients connectés
-                                printf("Clients connectes : ");
-                                for (int i = 0; i < NB_CLIENTS; i++) {
-                                if (liste_partagée[i] != 0) {
-                                        printf("[%d] ", liste_partagée[i]);
-                                }       
-                        }
                         //affichage du message reçu
                         int sortieTube = open("tubebroker", O_RDONLY);
                         read(sortieTube, &uneRequete, sizeof(uneRequete));
-                        printf("\n Message reçu par le tube nommé : %s\n", uneRequete.corps.msg);
                         close(sortieTube);
+                        sem_wait(sem);
 
                         //renvoie à tout les clients
+                        if (strlen(uneRequete.corps.msg) > 0) {
                         for (int i = 0; i < NB_CLIENTS; i++) {
-                                if (liste_partagée[i] != 0) {
-                                        sprintf(nomTube, "fifo_%d", liste_partagée[i]);
-                                        int entreeTube = open(nomTube, O_WRONLY | O_NONBLOCK);
+                                if (liste_pids_partagée[i] != 0) {
+                                        sprintf(nomTube, "fifo_%d", liste_pids_partagée[i]);
+                                        int entreeTube = open(nomTube, O_WRONLY);
                                         write(entreeTube, uneRequete.corps.msg, sizeof(uneRequete.corps.msg));
                                         close(entreeTube);
                                 }    
 
                                 
                         }
+                }
                         sem_post(sem);
         }
 
@@ -144,7 +140,7 @@ do
  } while (1);
 }
 } while(1);
-shmdt(liste_partagée);
+shmdt(liste_pids_partagée);
 shmctl(test_mem, IPC_RMID, NULL);
 sem_close(sem);
 sem_unlink("/semaphore");

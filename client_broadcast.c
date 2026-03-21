@@ -40,19 +40,22 @@ uneRequete.corps.choix_menu = 1;
 sem_t *sem = sem_open("/semaphore", 0);
 int listé = 0;
 //Envoi du choix du mode 
+uneRequete.corps.msg[0] = '\0';
 int entreeTube = open("tubebroker", O_WRONLY | O_NONBLOCK);
-            write(entreeTube, uneRequete.corps.choix_menu, sizeof(uneRequete));
+            write(entreeTube, &uneRequete, sizeof(uneRequete));
             close(entreeTube);
 /* Ouverture/Création + attachement de la mémoire partagée */
 int test_mem;
-int *liste_partagée;
-test_mem=shmget(KEY_MEM,1024,0666);
+int *liste_pids_partagée;
+char (*liste_pseudos_partagée)[50];
+test_mem=shmget(KEY_MEM,5000,0666);
 if(test_mem == -1){
         printf("La sémphore à eu une erreur lors de la création");
       return -1;  
 }
-liste_partagée  =  (int*) shmat(test_mem,NULL,0);
-if(liste_partagée == (int*) -1){
+liste_pids_partagée  =  (int*) shmat(test_mem,NULL,0);
+liste_pseudos_partagée  =  (char (*)[50])(liste_pids_partagée + 100);
+if(liste_pids_partagée == (int*) -1){
         printf("La mémoire partagé ne s'est pas attachée");
         return -1;
 }  
@@ -68,7 +71,7 @@ if (fork() == 0) {
     while (1) {
         int sortieTube = open(nomTube, O_RDONLY);
         read(sortieTube, message, TAILLE_MESSAGE);
-        printf("\n Message reçu par le tube nommé : %s\n", message);
+        printf("\n%s\n", message);
         printf("Saisissez votre message : "); 
         fflush(stdout); 
         close(sortieTube);
@@ -80,7 +83,7 @@ for (i=0;i < 1000; i++)
 {   
     sem_wait(sem);
         for (int j=0; j<NB_CLIENTS; j++){
-            if (liste_partagée[j] == getpid())
+            if (liste_pids_partagée[j] == getpid())
             {
                 listé = 1;
                 break;
@@ -89,9 +92,10 @@ for (i=0;i < 1000; i++)
         if (listé == 0)
         {
             for (int j=0; j<NB_CLIENTS; j++){
-                if (liste_partagée[j] == 0)
+                if (liste_pids_partagée[j] == 0)
                 {
-                    liste_partagée[j] = getpid();
+                    liste_pids_partagée[j] = getpid();
+                    strcpy(liste_pseudos_partagée[j], argv[1]);
                     break;
                 }
             }
@@ -103,9 +107,9 @@ for (i=0;i < 1000; i++)
         {
             sem_wait(sem);
             for (int j=0; j<NB_CLIENTS; j++){
-                if (liste_partagée[j] == getpid())
+                if (liste_pids_partagée[j] == getpid())
                 {
-                    liste_partagée[j] = 0;
+                    liste_pids_partagée[j] = 0;
                     break;
                 }
             }
@@ -114,13 +118,13 @@ for (i=0;i < 1000; i++)
             break;
         }
         else {
-            sprintf(uneRequete.corps.msg, "%s", leTexte);
-            int entreeTube = open("tubebroker", O_WRONLY | O_NONBLOCK);
+            sprintf(uneRequete.corps.msg, "%s : %s", argv[1],leTexte);
+            int entreeTube = open("tubebroker", O_WRONLY);
             write(entreeTube, &uneRequete, sizeof(uneRequete));
             close(entreeTube);
         }
     }
-shmdt(liste_partagée);
+shmdt(liste_pids_partagée);
 sem_close(sem);
 unlink(nomTube);
 return 0;
