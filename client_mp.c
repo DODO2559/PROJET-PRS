@@ -35,10 +35,11 @@ key_t laClef;
 char nomTube[50] = "tube";
 char message[TAILLE_MESSAGE]="RIEN";
 CHECK(laClef =ftok("broker",PROJECTID),"ftok");
-uneRequete.corps.choix_menu = 1;
+uneRequete.corps.choix_menu = 2;
 int listé = 0;
 int trouvé = 0;
 int liste_pids[100];
+int message_recu = 0;
 sem_t *sem = sem_open("/semaphore", 0);
 //Envoi du choix du mode 
 int entreeTube = open("tubebroker", O_WRONLY | O_NONBLOCK);
@@ -46,31 +47,33 @@ int entreeTube = open("tubebroker", O_WRONLY | O_NONBLOCK);
             close(entreeTube);
 /* Ouverture/Création + attachement de la mémoire partagée */
 int test_mem;
-int *liste_partagée;
-test_mem=shmget(KEY_MEM,1024,0666);
+int *liste_pids_partagée;
+char (*liste_pseudos_partagée)[50];
+test_mem=shmget(KEY_MEM,5000,0666);
 if(test_mem == -1){
-        printf("La sémphore à eu une erreur lors de la création");
+        printf("La sémphore à eu une erreur lors de la création \n");
       return -1;  
 }
-liste_partagée  =  (int*) shmat(test_mem,NULL,0);
-if(liste_partagée == (int*) -1){
-        printf("La mémoire partagé ne s'est pas attachée");
+liste_pids_partagée  =  (int*) shmat(test_mem,NULL,0);
+liste_pseudos_partagée  =  (char (*)[50])(liste_pids_partagée + 100);
+if(liste_pids_partagée == (int*) -1){
+        printf("La mémoire partagé ne s'est pas attachée \n");
         return -1;
 }  
-
 //On crée le tube (le nom est en fonction du pid du client pour pouvoir les dissocier)
 uneRequete.corps.pid_expediteur = getpid();
 sprintf(nomTube, "fifo_%d", uneRequete.corps.pid_expediteur);
 mkfifo(nomTube, 0666);
 
-
 //lecture des tubes sans arret
 if (fork() == 0) {
     while (1) {
         int sortieTube = open(nomTube, O_RDONLY);
-        read(sortieTube, message, TAILLE_MESSAGE);
-        printf("\n Message reçu par le tube nommé : %s\n", message); 
-        printf("Saisissez le PID du destinataire : ");
+        if (read(sortieTube, message, TAILLE_MESSAGE) > 0) {
+        printf("\n%s\n", message); 
+        printf("Saisissez le pseudo du destinataire : "); 
+        fflush(stdout);
+        }
         close(sortieTube);
     }
     exit(0);
@@ -80,7 +83,7 @@ for (i=0;i < 1000; i++)
 {   
     sem_wait(sem);
         for (int j=0; j<NB_CLIENTS; j++){
-            if (liste_partagée[j] == getpid())
+            if (liste_pids_partagée[j] == getpid())
             {
                 listé = 1;
                 break;
@@ -89,28 +92,37 @@ for (i=0;i < 1000; i++)
         if (listé == 0)
         {
             for (int j=0; j<NB_CLIENTS; j++){
-                if (liste_partagée[j] == 0)
+                if (liste_pids_partagée[j] == 0)
                 {
-                    liste_partagée[j] = getpid();
+                    liste_pids_partagée[j] = getpid();
+                    strcpy(liste_pseudos_partagée[j], argv[1]);
                     break;
                 }
             }
         }
         for(int i=0; i<100; i++) {
-        liste_pids[i] = liste_partagée[i]; 
+        liste_pids[i] = liste_pids_partagée[i]; 
         }
         sem_post(sem);
             printf("Liste Client :");
             for (int j=0; j<NB_CLIENTS; j++){
-                if (liste_partagée[j] != 0) {
-                    printf(" [%d]", liste_pids[j]);
+                if (liste_pseudos_partagée[j][0] != 0) {
+                    printf(" [%s]", liste_pseudos_partagée[j]);
                 }
             }
             printf("\n");
         
-        printf("Saisissez le PID du destinataire : "); 
+        printf("Saisissez le pseudo du destinataire : "); 
         fgets(leTexte,sizeof(leTexte),stdin);
-        uneRequete.corps.pid_destinataire = atoi(leTexte);
+        leTexte[strcspn(leTexte, "\n")] = 0;
+        uneRequete.corps.pid_destinataire = 0;
+        for (int j=0; j<NB_CLIENTS; j++){
+            if (strcmp(liste_pseudos_partagée[j], leTexte) == 0)
+            {
+                uneRequete.corps.pid_destinataire = liste_pids_partagée[j];
+                break;
+            }
+        }
         if(uneRequete.corps.pid_destinataire != 0){
         trouvé = 0;
         for (int j=0; j<NB_CLIENTS; j++){
@@ -121,7 +133,7 @@ for (i=0;i < 1000; i++)
             }
         }}
         if (trouvé == 0) {
-            printf("PID n'est pas dans la liste\n");
+            printf("Le pseudo n'est pas dans la liste\n");
             continue;
         }
         printf("Saisissez votre message : "); 
@@ -130,9 +142,9 @@ for (i=0;i < 1000; i++)
         {
             sem_wait(sem);
             for (int j=0; j<NB_CLIENTS; j++){
-                if (liste_partagée[j] == getpid())
+                if (liste_pids_partagée[j] == getpid())
                 {
-                    liste_partagée[j] = 0;
+                    liste_pids_partagée[j] = 0;
                     break;
                 }
             }
@@ -141,13 +153,13 @@ for (i=0;i < 1000; i++)
             break;
         }
         else {
-            sprintf(uneRequete.corps.msg, "%s", leTexte);
-            int entreeTube = open("tubebroker", O_WRONLY | O_NONBLOCK);
+            sprintf(uneRequete.corps.msg, "%s : %s", argv[1],leTexte);
+            int entreeTube = open("tubebroker", O_WRONLY);
             write(entreeTube, &uneRequete, sizeof(uneRequete));
             close(entreeTube);
         }
     }
-shmdt(liste_partagée);
+shmdt(liste_pids_partagée);
 sem_close(sem);
 unlink(nomTube);
 

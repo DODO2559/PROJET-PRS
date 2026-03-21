@@ -1,6 +1,8 @@
 #include <ncurses.h>
 #include <string.h>
 #include <time.h>
+#include <stdlib.h>
+#include <unistd.h>
 /* ========================================================= */
 /* Installation de la librairie ncurses + documentation      */
 /* sudo apt install libncurses5-dev libncursesw5-dev         */
@@ -51,7 +53,8 @@ int main() {
     int highlight = 0;
     int ch;
     char buffer[100];
-
+    char pseudo[50];
+    char commande[150];
 
     initscr();
     noecho();
@@ -73,16 +76,24 @@ int main() {
 
             case '\n':  // touche Enter
                 clear();
-                if (highlight == 0) {
+                if (highlight == 0 || highlight == 1) {
+                    echo();
+                    mvprintw(5, 5, "Veuillez entrer votre pseudo : ");
+                    refresh();
+                    getnstr(pseudo, 49);
+                    noecho();
                     endwin(); 
-                    system("./client_broadcast");
+                }
+                if (highlight == 0) {
+                    sprintf(commande, "./client_broadcast %s", pseudo);
+                    system(commande);
                     sleep(2);
                     initscr(); 
                     keypad(stdscr, TRUE); 
                 }
                 else if (highlight == 1) {
-                    endwin(); 
-                    system("./client_mp");
+                    sprintf(commande, "./client_mp %s", pseudo);
+                    system(commande);
                     sleep(2);
                     initscr(); 
                     keypad(stdscr, TRUE); 

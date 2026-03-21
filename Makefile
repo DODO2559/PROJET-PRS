@@ -1,15 +1,16 @@
 CC = gcc
 CFLAGS = -Wall
 
-all: broker client_broadcast client_mp menu.x
+all: clean broker client_broadcast client_mp menu
 
 broker client_broadcast client_mp: %: %.c message.h
 	$(CC) $(CFLAGS) $< -o $@
 
-menu.x: menu.c
+menu: menu.c
 	$(CC) $(CFLAGS) $< -o $@ -lncursesw
 
 clean:
-	rm -f *.o broker client_mp client_broadcast menu.x
+	rm -f *.o broker client_mp client_broadcast menu
 	rm -f fifo_*
 	rm -f tubebroker
+	rm -f /dev/shm/sem.semaphore
