@@ -10,12 +10,13 @@
 /* Documentation :                                           */
 /* https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/index.html */
 /* ========================================================= */
-#define NB_CHOICES 3
+#define NB_CHOICES 4
 
 const char *choices[NB_CHOICES] = {
     "Option 1 : Salon General",
     "Option 2 : Messages prives",
-    "Option 3 : Quitter"
+    "Option 3 : Groupes",
+    "Option 4 : Quitter"
 };
 
 void print_menu(int highlight) {
@@ -76,7 +77,7 @@ int main() {
 
             case '\n':  // touche Enter
                 clear();
-                if (highlight == 0 || highlight == 1) {
+                if (highlight == 0 || highlight == 1 || highlight == 2) {
                     echo();
                     mvprintw(5, 5, "Veuillez entrer votre pseudo : ");
                     refresh();
@@ -99,6 +100,13 @@ int main() {
                     keypad(stdscr, TRUE); 
                 }
                 else if (highlight == 2) {
+                    sprintf(commande, "./client_groupes %s", pseudo);
+                    system(commande);
+                    sleep(2);
+                    initscr(); 
+                    keypad(stdscr, TRUE); 
+                }
+                else if (highlight == 3) {
                     endwin();
                     return 0;
                 }

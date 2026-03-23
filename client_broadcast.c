@@ -48,7 +48,7 @@ int entreeTube = open("tubebroker", O_WRONLY | O_NONBLOCK);
 int test_mem;
 int *liste_pids_partagée;
 char (*liste_pseudos_partagée)[50];
-test_mem=shmget(KEY_MEM,5000,0666);
+test_mem=shmget(KEY_MEM,12000,0666);
 if(test_mem == -1){
         printf("La sémphore à eu une erreur lors de la création");
       return -1;  
