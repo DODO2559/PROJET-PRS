@@ -74,12 +74,6 @@ do{
                         
 //MP
 if(uneRequete.corps.choix_menu==2){
-do
-{                       //recup le message reçu
-                        int sortieTube = open("tubebroker", O_RDONLY);
-                        read(sortieTube, &uneRequete, sizeof(uneRequete));
-                        close(sortieTube);
-
                         sem_wait(sem);
                         //renvoie au destinataire
                         for (int i = 0; i < NB_CLIENTS; i++) {
@@ -90,36 +84,13 @@ do
                                         write(entreeTube, uneRequete.corps.msg, sizeof(uneRequete.corps.msg));
                                         close(entreeTube);
                                 }    
-                                
-
-                                
                         }
                         sem_post(sem);
-        
-
-        
-
-                
-                         
-        
-
- } while (1);
 }
 
 
 //BROADCAST
 if(uneRequete.corps.choix_menu==1){
-
-
-
-        
-do
-{       
-                while (1) {
-                        //recup le message reçu
-                        int sortieTube = open("tubebroker", O_RDONLY);
-                        read(sortieTube, &uneRequete, sizeof(uneRequete));
-                        close(sortieTube);
                         sem_wait(sem);
 
                         //renvoie à tout les clients
@@ -131,34 +102,12 @@ do
                                         write(entreeTube, uneRequete.corps.msg, sizeof(uneRequete.corps.msg));
                                         close(entreeTube);
                                 }    
-
-                                
                         }
                 }
                         sem_post(sem);
-        }
-
-        
-
-                
-                         
-        
-
- } while (1);
 }
 //mode groupe
 if(uneRequete.corps.choix_menu==3){
-
-
-
-        
-do
-{       
-                while (1) {
-                        //recup le message reçu
-                        int sortieTube = open("tubebroker", O_RDONLY);
-                        read(sortieTube, &uneRequete, sizeof(uneRequete));
-                        close(sortieTube);
                         sem_wait(sem);
 
                         //renvoie à tout les clients
@@ -181,17 +130,6 @@ do
                         }    
                         }
                         sem_post(sem);
-                }
-                
-        }while (1);
-
-        
-
-                
-                         
-        
-
- 
 }
 } while(1);
 shmdt(liste_pids_partagée);

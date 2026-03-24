@@ -41,10 +41,6 @@ int trouvé = 0;
 int liste_pids[100];
 int message_recu = 0;
 sem_t *sem = sem_open("/semaphore", 0);
-//Envoi du choix du mode 
-int entreeTube = open("tubebroker", O_WRONLY | O_NONBLOCK);
-            write(entreeTube, &uneRequete, sizeof(uneRequete));
-            close(entreeTube);
 /* Ouverture/Création + attachement de la mémoire partagée */
 int test_mem;
 int *liste_pids_partagée;
@@ -91,19 +87,25 @@ for (i=0;i < 1000; i++)
         }
         if (listé == 0)
         {
-            for (int j=0; j<NB_CLIENTS; j++){
-                if (liste_pids_partagée[j] == 0)
-                {
-                    liste_pids_partagée[j] = getpid();
-                    strcpy(liste_pseudos_partagée[j], argv[1]);
-                    break;
-                }
+        for (int j=0; j<NB_CLIENTS; j++){
+            if (liste_pids_partagée[j] != 0 && strcmp(liste_pseudos_partagée[j], argv[1]) == 0)
+            {
+                sem_post(sem);
+                printf("Le pseudo '%s' est déjà utilisé. Connexion refusée.\n", argv[1]);
+                shmdt(liste_pids_partagée);
+                sem_close(sem);
+                unlink(nomTube);
+                return 1;
             }
         }
-        for(int i=0; i<100; i++) {
-        liste_pids[i] = liste_pids_partagée[i]; 
+        for (int j=0; j<NB_CLIENTS; j++){
+            if (liste_pids_partagée[j] == 0){
+                liste_pids_partagée[j] = getpid();
+                strcpy(liste_pseudos_partagée[j], argv[1]);
+                break;
+            }
         }
-        sem_post(sem);
+        }
             printf("Liste Client :");
             for (int j=0; j<NB_CLIENTS; j++){
                 if (liste_pseudos_partagée[j][0] != 0) {
@@ -111,6 +113,7 @@ for (i=0;i < 1000; i++)
                 }
             }
             printf("\n");
+            sem_post(sem);
         
         printf("Saisissez le pseudo du destinataire : "); 
         fgets(leTexte,sizeof(leTexte),stdin);
@@ -128,24 +131,17 @@ for (i=0;i < 1000; i++)
             printf("\n Sortie de l'application\n");
             break;
         }
+        sem_wait(sem);
         uneRequete.corps.pid_destinataire = 0;
         for (int j=0; j<NB_CLIENTS; j++){
-            if (strcmp(liste_pseudos_partagée[j], leTexte) == 0)
-            {
-                uneRequete.corps.pid_destinataire = liste_pids_partagée[j];
-                break;
-            }
+        if (strcmp(liste_pseudos_partagée[j], leTexte) == 0 && liste_pids_partagée[j] != 0)
+        {
+            uneRequete.corps.pid_destinataire = liste_pids_partagée[j];
+            break;
         }
-        if(uneRequete.corps.pid_destinataire != 0){
-        trouvé = 0;
-        for (int j=0; j<NB_CLIENTS; j++){
-            if(liste_pids[j] == uneRequete.corps.pid_destinataire)
-            {
-                trouvé = 1;
-                break;
-            }
-        }}
-        if (trouvé == 0) {
+        }
+        sem_post(sem);
+        if (uneRequete.corps.pid_destinataire == 0) {
             printf("Le pseudo n'est pas dans la liste\n");
             continue;
         }

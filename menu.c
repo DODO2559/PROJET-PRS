@@ -83,6 +83,9 @@ int main() {
                     refresh();
                     getnstr(pseudo, 49);
                     noecho();
+                    if (strlen(pseudo) == 0) {
+                        continue; 
+                    }
                     endwin(); 
                 }
                 if (highlight == 0) {

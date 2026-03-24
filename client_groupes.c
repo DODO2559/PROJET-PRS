@@ -41,10 +41,6 @@ int trouvé = 0;
 int liste_pids[100];
 int message_recu = 0;
 sem_t *sem = sem_open("/semaphore", 0);
-//Envoi du choix du mode 
-int entreeTube = open("tubebroker", O_WRONLY | O_NONBLOCK);
-            write(entreeTube, &uneRequete, sizeof(uneRequete));
-            close(entreeTube);
 /* Ouverture/Création + attachement de la mémoire partagée */
 int test_mem;
 int *liste_pids_partagée;
@@ -94,19 +90,27 @@ for (i=0;i < 1000; i++)
         }
         if (listé == 0)
         {
-            for (int j=0; j<NB_CLIENTS; j++){
-                if (liste_pids_partagée[j] == 0)
-                {
-                    liste_pids_partagée[j] = getpid();
-                    strcpy(liste_pseudos_partagée[j], argv[1]);
-                    break;
-                }
+        for (int j=0; j<NB_CLIENTS; j++){
+            if (liste_pids_partagée[j] != 0 && strcmp(liste_pseudos_partagée[j], argv[1]) == 0)
+            {
+                sem_post(sem);
+                printf("Le pseudo '%s' est déjà utilisé. Connexion refusée.\n", argv[1]);
+                shmdt(liste_pids_partagée);
+                sem_close(sem);
+                unlink(nomTube);
+                return 1;
+            }   
+        }
+        for (int j=0; j<NB_CLIENTS; j++){
+            if (liste_pids_partagée[j] == 0){
+                liste_pids_partagée[j] = getpid();
+                strcpy(liste_pseudos_partagée[j], argv[1]);
+                break;
             }
         }
-        for(int i=0; i<10; i++) {
-        liste_pids[i] = liste_pids_partagée[i]; 
         }
         sem_post(sem);
+        sem_wait(sem);
             printf("Vos Groupes :");
             for (int j=0; j<10; j++){
             if (liste_groupes_partagée[j][0][0] != 0) {
@@ -119,6 +123,7 @@ for (i=0;i < 1000; i++)
             }
         }
         printf("\n");
+        sem_post(sem);
         
         printf("Saisissez le nom du groupe : "); 
         fgets(leTexte,sizeof(leTexte),stdin);
@@ -136,6 +141,7 @@ for (i=0;i < 1000; i++)
             printf("\n Sortie de l'application\n");
             break;
         }
+        sem_wait(sem);
         int groupe_existe = 0;
         for (int j=0; j<10; j++){
             if (strcmp(liste_groupes_partagée[j][0], leTexte) == 0)
@@ -154,12 +160,14 @@ for (i=0;i < 1000; i++)
                 }
             }
         }
+        sem_post(sem);
         if (!groupe_existe) {
-            printf("Le groupe n'existe pas, souhaitez-vous le créer ? (O/N)\n");
+            printf("Créer le groupe ? (O/N)\n");
             char reponse;
             scanf(" %c", &reponse);
             while(getchar() != '\n');
             if (reponse == 'O' || reponse == 'o') {
+                sem_wait(sem);
                 for (int j = 0; j < 10; j++) {
                     if (liste_groupes_partagée[j][0][0] == 0) {
                         strcpy(liste_groupes_partagée[j][0], leTexte);
@@ -168,15 +176,17 @@ for (i=0;i < 1000; i++)
                         break;
                     }
                 }
+                sem_post(sem);
             }
             continue;
         }
         else if (!est_membre) {
-            printf("Vous n'êtes pas membre de ce groupe. Souhaitez-vous le rejoindre ? (O/N)\n");
+            printf("Rejoindre le groupe ? (O/N)\n");
             char reponse;
             scanf(" %c", &reponse);
             while(getchar() != '\n');
             if (reponse == 'O' || reponse == 'o') {
+                sem_wait(sem);
                 for (int k = 1; k < 11; k++) {
                     if (liste_groupes_partagée[uneRequete.corps.groupe_id][k][0] == '\0') {
                         strcpy(liste_groupes_partagée[uneRequete.corps.groupe_id][k], argv[1]);
@@ -184,6 +194,7 @@ for (i=0;i < 1000; i++)
                         break;
                     }
                 }
+                sem_post(sem);
             }
             continue;
         }
