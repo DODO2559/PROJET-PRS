@@ -35,7 +35,7 @@ key_t laClef;
 char nomTube[50] = "tube";
 char message[TAILLE_MESSAGE]="RIEN";
 CHECK(laClef =ftok("broker",PROJECTID),"ftok");
-uneRequete.corps.choix_menu = 2;
+uneRequete.corps.choix_menu = 3;
 int listé = 0;
 int trouvé = 0;
 int liste_pids[100];
@@ -45,6 +45,8 @@ sem_t *sem = sem_open("/semaphore", 0);
 int test_mem;
 int *liste_pids_partagée;
 char (*liste_pseudos_partagée)[50];
+char (*liste_groupes_partagée)[11][50];
+uneRequete.corps.groupe_id = -1;
 test_mem=shmget(KEY_MEM,12000,0666);
 if(test_mem == -1){
         printf("La sémphore à eu une erreur lors de la création \n");
@@ -52,6 +54,7 @@ if(test_mem == -1){
 }
 liste_pids_partagée  =  (int*) shmat(test_mem,NULL,0);
 liste_pseudos_partagée  =  (char (*)[50])(liste_pids_partagée + 100);
+liste_groupes_partagée = (char (*)[11][50])(liste_pseudos_partagée + 100);
 if(liste_pids_partagée == (int*) -1){
         printf("La mémoire partagé ne s'est pas attachée \n");
         return -1;
@@ -66,9 +69,9 @@ if (fork() == 0) {
     while (1) {
         int sortieTube = open(nomTube, O_RDONLY);
         if (read(sortieTube, message, TAILLE_MESSAGE) > 0) {
-        printf("\n%s\n", message); 
-        printf("Saisissez le pseudo du destinataire : "); 
-        fflush(stdout);
+            printf("\n%s\n", message);
+            printf("Saisissez le nom du groupe : ");
+            fflush(stdout);
         }
         close(sortieTube);
     }
@@ -96,7 +99,7 @@ for (i=0;i < 1000; i++)
                 sem_close(sem);
                 unlink(nomTube);
                 return 1;
-            }
+            }   
         }
         for (int j=0; j<NB_CLIENTS; j++){
             if (liste_pids_partagée[j] == 0){
@@ -106,16 +109,23 @@ for (i=0;i < 1000; i++)
             }
         }
         }
-            printf("Liste Client :");
-            for (int j=0; j<NB_CLIENTS; j++){
-                if (liste_pseudos_partagée[j][0] != 0) {
-                    printf(" [%s]", liste_pseudos_partagée[j]);
+        sem_post(sem);
+        sem_wait(sem);
+            printf("Vos Groupes :");
+            for (int j=0; j<10; j++){
+            if (liste_groupes_partagée[j][0][0] != 0) {
+                for (int k=1; k<11; k++){
+                    if (strcmp(liste_groupes_partagée[j][k], argv[1]) == 0) {
+                        printf(" [%s]", liste_groupes_partagée[j][0]);
+                        break;
+                    }
                 }
             }
-            printf("\n");
-            sem_post(sem);
+        }
+        printf("\n");
+        sem_post(sem);
         
-        printf("Saisissez le pseudo du destinataire : "); 
+        printf("Saisissez le nom du groupe : "); 
         fgets(leTexte,sizeof(leTexte),stdin);
         leTexte[strcspn(leTexte, "\n")] = 0;
         if (strncmp(leTexte, "EXIT", 4) == 0) {
@@ -132,17 +142,60 @@ for (i=0;i < 1000; i++)
             break;
         }
         sem_wait(sem);
-        uneRequete.corps.pid_destinataire = 0;
-        for (int j=0; j<NB_CLIENTS; j++){
-        if (strcmp(liste_pseudos_partagée[j], leTexte) == 0 && liste_pids_partagée[j] != 0)
-        {
-            uneRequete.corps.pid_destinataire = liste_pids_partagée[j];
-            break;
+        int groupe_existe = 0;
+        for (int j=0; j<10; j++){
+            if (strcmp(liste_groupes_partagée[j][0], leTexte) == 0)
+            {
+                uneRequete.corps.groupe_id = j;
+                groupe_existe = 1;
+                break;
+            }
         }
+        int est_membre = 0;
+        if (groupe_existe) {
+            for (int k = 1; k < 11; k++) {
+                if (strcmp(liste_groupes_partagée[uneRequete.corps.groupe_id][k], argv[1]) == 0) {
+                    est_membre = 1;
+                    break;
+                }
+            }
         }
         sem_post(sem);
-        if (uneRequete.corps.pid_destinataire == 0) {
-            printf("Le pseudo n'est pas dans la liste\n");
+        if (!groupe_existe) {
+            printf("Créer le groupe ? (O/N)\n");
+            char reponse;
+            scanf(" %c", &reponse);
+            while(getchar() != '\n');
+            if (reponse == 'O' || reponse == 'o') {
+                sem_wait(sem);
+                for (int j = 0; j < 10; j++) {
+                    if (liste_groupes_partagée[j][0][0] == 0) {
+                        strcpy(liste_groupes_partagée[j][0], leTexte);
+                        strcpy(liste_groupes_partagée[j][1], argv[1]);
+                        uneRequete.corps.groupe_id = j;
+                        break;
+                    }
+                }
+                sem_post(sem);
+            }
+            continue;
+        }
+        else if (!est_membre) {
+            printf("Rejoindre le groupe ? (O/N)\n");
+            char reponse;
+            scanf(" %c", &reponse);
+            while(getchar() != '\n');
+            if (reponse == 'O' || reponse == 'o') {
+                sem_wait(sem);
+                for (int k = 1; k < 11; k++) {
+                    if (liste_groupes_partagée[uneRequete.corps.groupe_id][k][0] == '\0') {
+                        strcpy(liste_groupes_partagée[uneRequete.corps.groupe_id][k], argv[1]);
+                        printf("Vous avez rejoint le groupe %s\n", leTexte);
+                        break;
+                    }
+                }
+                sem_post(sem);
+            }
             continue;
         }
         printf("Saisissez votre message : "); 
@@ -162,7 +215,7 @@ for (i=0;i < 1000; i++)
             break;
         }
         else {
-            sprintf(uneRequete.corps.msg, "%s : %s", argv[1],leTexte);
+            sprintf(uneRequete.corps.msg, "[%s] %s : %s", liste_groupes_partagée[uneRequete.corps.groupe_id][0], argv[1], leTexte);
             int entreeTube = open("tubebroker", O_WRONLY);
             write(entreeTube, &uneRequete, sizeof(uneRequete));
             close(entreeTube);

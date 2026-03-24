@@ -43,13 +43,15 @@ sem_t *sem = sem_open("/semaphore", O_CREAT, 0666, 1);
 int test_mem;
 int *liste_pids_partagée;
 char (*liste_pseudos_partagée)[50];
-test_mem=shmget(KEY_MEM, 5000,0666 | IPC_CREAT);
+char (*liste_groupes_partagée)[11][50];
+test_mem=shmget(KEY_MEM, 12000,0666 | IPC_CREAT);
 if(test_mem == -1){
         printf("La sémphore à eu une erreur lors de la création");
       return -1;  
 }
 liste_pids_partagée  =  (int*) shmat(test_mem,NULL,0);
 liste_pseudos_partagée  =  (char (*)[50])(liste_pids_partagée + 100);
+liste_groupes_partagée = (char (*)[11][50])(liste_pseudos_partagée + 100);
 if(liste_pids_partagée == (int*) -1){
         printf("La mémoire partagé ne s'est pas attachée");
         return -1;
@@ -58,7 +60,12 @@ if(liste_pids_partagée == (int*) -1){
 for (int i = 0; i < NB_CLIENTS; i++) {
     liste_pids_partagée[i] = 0;
     liste_pseudos_partagée[i][0] = '\0';
-}        
+}     
+for (int i = 0; i < 10; i++) { 
+    for (int j = 0; j < 11; j++) {
+        liste_groupes_partagée[i][j][0] = '\0';
+    }
+}
 
 do{
         int sortieTube = open("tubebroker", O_RDONLY);
@@ -67,12 +74,6 @@ do{
                         
 //MP
 if(uneRequete.corps.choix_menu==2){
-do
-{                       //recup le message reçu
-                        int sortieTube = open("tubebroker", O_RDONLY);
-                        read(sortieTube, &uneRequete, sizeof(uneRequete));
-                        close(sortieTube);
-
                         sem_wait(sem);
                         //renvoie au destinataire
                         for (int i = 0; i < NB_CLIENTS; i++) {
@@ -83,36 +84,13 @@ do
                                         write(entreeTube, uneRequete.corps.msg, sizeof(uneRequete.corps.msg));
                                         close(entreeTube);
                                 }    
-                                
-
-                                
                         }
                         sem_post(sem);
-        
-
-        
-
-                
-                         
-        
-
- } while (1);
 }
 
 
 //BROADCAST
 if(uneRequete.corps.choix_menu==1){
-
-
-
-        
-do
-{       
-                while (1) {
-                        //affichage du message reçu
-                        int sortieTube = open("tubebroker", O_RDONLY);
-                        read(sortieTube, &uneRequete, sizeof(uneRequete));
-                        close(sortieTube);
                         sem_wait(sem);
 
                         //renvoie à tout les clients
@@ -124,20 +102,34 @@ do
                                         write(entreeTube, uneRequete.corps.msg, sizeof(uneRequete.corps.msg));
                                         close(entreeTube);
                                 }    
-
-                                
                         }
                 }
                         sem_post(sem);
-        }
+}
+//mode groupe
+if(uneRequete.corps.choix_menu==3){
+                        sem_wait(sem);
 
-        
-
-                
-                         
-        
-
- } while (1);
+                        //renvoie à tout les clients
+                        if (uneRequete.corps.groupe_id >= 0 && uneRequete.corps.groupe_id < 10) {
+                        for (int i = 1; i < 10; i++) {
+                                if (liste_groupes_partagée[uneRequete.corps.groupe_id][i][0] != '\0') {
+                                        for (int j = 0; j < NB_CLIENTS; j++) {
+                                                if (strcmp(liste_pseudos_partagée[j], liste_groupes_partagée[uneRequete.corps.groupe_id][i]) == 0) {
+                                                        uneRequete.corps.pid_destinataire = liste_pids_partagée[j];
+                                                        break;
+                                                }
+                                        }
+                                        if(uneRequete.corps.pid_destinataire != uneRequete.corps.pid_expediteur){
+                                        sprintf(nomTube, "fifo_%d", uneRequete.corps.pid_destinataire);
+                                        int entreeTube = open(nomTube, O_WRONLY);
+                                        write(entreeTube, uneRequete.corps.msg, sizeof(uneRequete.corps.msg));
+                                        close(entreeTube);
+                                        }
+                                }
+                        }    
+                        }
+                        sem_post(sem);
 }
 } while(1);
 shmdt(liste_pids_partagée);

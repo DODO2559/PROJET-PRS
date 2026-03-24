@@ -39,16 +39,11 @@ CHECK(laClef =ftok("broker",PROJECTID),"ftok");
 uneRequete.corps.choix_menu = 1;
 sem_t *sem = sem_open("/semaphore", 0);
 int listé = 0;
-//Envoi du choix du mode 
-uneRequete.corps.msg[0] = '\0';
-int entreeTube = open("tubebroker", O_WRONLY | O_NONBLOCK);
-            write(entreeTube, &uneRequete, sizeof(uneRequete));
-            close(entreeTube);
 /* Ouverture/Création + attachement de la mémoire partagée */
 int test_mem;
 int *liste_pids_partagée;
 char (*liste_pseudos_partagée)[50];
-test_mem=shmget(KEY_MEM,5000,0666);
+test_mem=shmget(KEY_MEM,12000,0666);
 if(test_mem == -1){
         printf("La sémphore à eu une erreur lors de la création");
       return -1;  
@@ -92,13 +87,23 @@ for (i=0;i < 1000; i++)
         if (listé == 0)
         {
             for (int j=0; j<NB_CLIENTS; j++){
-                if (liste_pids_partagée[j] == 0)
+                if (liste_pids_partagée[j] != 0 && strcmp(liste_pseudos_partagée[j], argv[1]) == 0)
                 {
-                    liste_pids_partagée[j] = getpid();
-                    strcpy(liste_pseudos_partagée[j], argv[1]);
-                    break;
+                    sem_post(sem);
+                    printf("Le pseudo '%s' est déjà utilisé. Connexion refusée.\n", argv[1]);
+                    shmdt(liste_pids_partagée);
+                    sem_close(sem);
+                    unlink(nomTube);
+                    return 1;
                 }
             }
+        for (int j=0; j<NB_CLIENTS; j++){
+        if (liste_pids_partagée[j] == 0){
+            liste_pids_partagée[j] = getpid();
+            strcpy(liste_pseudos_partagée[j], argv[1]);
+            break;
+        }
+        }
         }
         sem_post(sem);
         if(i==0) printf("Saisissez votre message : "); 

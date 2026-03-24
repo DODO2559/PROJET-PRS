@@ -3,6 +3,7 @@ typedef struct corps {
         pid_t pid_destinataire;
         char msg[256];
         int choix_menu;
+        int groupe_id;
 } t_corps;
 
 typedef struct requete {
